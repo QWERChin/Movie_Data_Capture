@@ -564,6 +564,8 @@ def main(args: tuple) -> Path:
             print('[-]Update check failed!',e)
 
     create_failed_folder(conf.failed_folder())
+    create_failed_folder(conf.exist_folder())
+    
 
     # Download Mapping Table, parallel version
     def fmd(f) -> typing.Tuple[str, Path]:

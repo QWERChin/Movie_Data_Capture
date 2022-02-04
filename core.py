@@ -27,6 +27,20 @@ def escape_path(path, escape_literals: str):  # Remove escape literals
     return path
 
 
+def moveExistFolder(filepath):
+    conf = config.getInstance()
+    exist_folder = conf.exist_folder()
+    exist_name = os.path.join(exist_folder, os.path.basename(filepath))
+
+    try:
+        if os.path.exists(exist_name):
+            print('[-]File Exists while moving to ExistFolder')
+            return
+        shutil.move(filepath, exist_name)
+    except:
+        print('[-]File Moving to ExistFolder unsuccessful!')
+
+
 def moveFailedFolder(filepath):
     conf = config.getInstance()
     failed_folder = conf.failed_folder()
@@ -82,21 +96,36 @@ def small_cover_check(path, filename, cover_small, movie_path, json_headers=None
         download_file_with_filename(cover_small, filename, path, movie_path)
     print('[+]Image Downloaded! ' + full_filepath.name)
 
+def create_folder_location_rule(json_data):
+    title, studio, year, outline, runtime, director, actor_photo, release, number, cover, trailer, website, series, label = get_info(json_data)
+    conf = config.getInstance()
+    success_folder = conf.success_folder()
+    actor = json_data.get('actor')
+
+    if 'actor' in conf.location_rule() and len(actor) > 80:
+        print(conf.location_rule())
+        json_data['actor'] = json_data['actor'][:80]
+
+    if len(actor.split(",")) > 1:
+        location_rule = eval("'多人作品'+'/'+"+conf.location_rule(), json_data)
+    else:
+        location_rule = eval(conf.location_rule(), json_data)
+
+    maxlen = conf.max_title_len()
+    if 'title' in conf.location_rule() and len(title) > maxlen:
+        shorttitle = title[0:maxlen]
+        location_rule = location_rule.replace(title, shorttitle)
+    
+    return location_rule 
+
 
 def create_folder(json_data):  # 创建文件夹
     title, studio, year, outline, runtime, director, actor_photo, release, number, cover, trailer, website, series, label = get_info(json_data)
     conf = config.getInstance()
     success_folder = conf.success_folder()
-    actor = json_data.get('actor')
-    location_rule = eval(conf.location_rule(), json_data)
-    if 'actor' in conf.location_rule() and len(actor) > 100:
-        print(conf.location_rule())
-        location_rule = eval(conf.location_rule().replace("actor","'多人作品'"), json_data)
-    maxlen = conf.max_title_len()
-    if 'title' in conf.location_rule() and len(title) > maxlen:
-        shorttitle = title[0:maxlen]
-        location_rule = location_rule.replace(title, shorttitle)
+
     # 当演员为空时，location_rule被计算为'/number'绝对路径，导致路径连接忽略第一个路径参数，因此添加./使其始终为相对路径
+    location_rule = create_folder_location_rule(json_data)
     path = os.path.join(success_folder, f'./{location_rule.strip()}')
     if not os.path.exists(path):
         path = escape_path(path, conf.escape_literals())
@@ -348,6 +377,7 @@ def print_files(path, leak_word, c_word, naming_rule, part, cn_sub, json_data, f
             print("  <plot><![CDATA[" + outline + "]]></plot>", file=code)
             print("  <runtime>" + str(runtime).replace(" ", "") + "</runtime>", file=code)
             print("  <director>" + director + "</director>", file=code)
+            # print("  <rating>" + json_data.get('score') + "</rating>", file=code)
             print("  <poster>" + poster_path + "</poster>", file=code)
             print("  <thumb>" + thumb_path + "</thumb>", file=code)
             print("  <fanart>" + fanart_path +  "</fanart>", file=code)
@@ -587,7 +617,7 @@ def paste_file_to_folder(filepath, path, multi_part, number, part, leak_word, c_
 
     except FileExistsError as fee:
         print(f'[-]FileExistsError: {fee}')
-        moveFailedFolder(filepath)
+        moveExistFolder(filepath)
         return
     except PermissionError:
         print('[-]Error! Please run as administrator!')
@@ -643,6 +673,21 @@ def paste_file_to_folder_mode2(filepath, path, multi_part, number, part, leak_wo
         return
     except OSError as oserr:
         print(f'[-]OS Error errno  {oserr.errno}')
+        return
+
+def get_part(filepath):
+    try:
+        if re.search('-CD\d+', filepath):
+            return re.findall('-CD\d+', filepath)[0]
+        if re.search('-cd\d+', filepath):
+            return re.findall('-cd\d+', filepath)[0]
+        if re.search(r'(^[\w]{3,5}-\d{3})([A,B,C,D])\.', filepath, flags=re.I):
+            return re.findall(r'(^[\w]{3,5}-\d{3})([A,B,C,D])\.', filepath, flags=re.I)[0][1]
+        if re.search(r'(^[\w]{3,5}-\d{3})(HHB)(\d)\.', filepath, flags=re.I):
+            return "-cd" + re.search(r'(^[\w]{3,5}-\d{3})(HHB)(\d)\.', filepath, flags=re.I)[3]
+    except:
+        print("[-]failed!Please rename the filename again!")
+        moveFailedFolder(filepath)
         return
 
 
@@ -833,6 +878,28 @@ def core_main(movie_path, number_th, oCC):
     #  2: 整理模式 / Organizing mode
     #  3：不改变路径刮削
     if conf.main_mode() == 1:
+
+        # Check duplicate nfo and movie file
+        if conf.check_exist_folder():
+            folders = conf.check_exist_folder().split(",")
+            for folder in folders:
+                location_rule = create_folder_location_rule(json_data)
+                temp_path = os.path.normpath(os.path.join(
+                    folder, f'./{location_rule.strip()}'))
+
+                nfo_path = os.path.join(
+                    temp_path, f"{number}{part}{leak_word}{c_word}{hack_word}.nfo")
+                filepath_obj = pathlib.Path(movie_path)
+                suffix = filepath_obj.suffix
+                targetpath = os.path.join(
+                    temp_path, f"{number}{leak_word}{c_word}{hack_word}{suffix}")
+
+                if os.path.exists(targetpath) and os.path.exists(nfo_path):
+                    print(
+                        f'[-]FileExistsError: File Exists on mutiple path check: {conf.check_exist_folder()}')
+                    moveExistFolder(movie_path)
+                    return
+
         # 创建文件夹
         path = create_folder(json_data)
         if multi_part == 1:

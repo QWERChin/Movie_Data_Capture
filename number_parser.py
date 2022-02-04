@@ -41,6 +41,8 @@ def get_number(debug: bool, file_path: str) -> str:
     # debug True 和 False 两块代码块合并，原因是此模块及函数只涉及字符串计算，没有IO操作，debug on时输出导致异常信息即可
     try:
         file_number = get_number_by_dict(filepath)
+        filepath = filepath.rsplit('.', 1)[0] # 忽略后缀
+        temp_filenumber = re.search(r"([a-z]{3,5})0{0,3}(\d{3})", G_spat.sub("", filepath), flags=re.I)
         if file_number:
             return file_number
         elif '字幕组' in filepath or 'SUB' in filepath.upper() or re.match(r'[\u30a0-\u30ff]+', filepath):
@@ -55,13 +57,19 @@ def get_number(debug: bool, file_path: str) -> str:
             lower_check = filename.lower()
             if 'fc2' in lower_check:
                 filename = lower_check.replace('ppv', '').replace('--', '-').replace('_', '-').upper()
-            filename = re.sub("[-_]cd\d{1,2}", "", filename, flags=re.IGNORECASE)
-            if not re.search("-|_", filename): # 去掉-CD1之后再无-的情况，例如n1012-CD1.wmv
-                return str(re.search(r'\w+', filename[:filename.find('.')], re.A).group())
+            filename = re.sub(r"(^[\w]{3,5}-\d{3})(ch)", r"\1", filename, flags=re.I) # 检查像是 mibd-706ch
+            filename = re.sub("(-|_)cd\d{1,2}", "", filename, flags=re.IGNORECASE)
+            filename = re.sub(r"(^[\w]{3,5}-\d{3})(HHB)\d?$", r"\1", filename, flags=re.I) # 检查像是 mibd-706HHB MIDE-007HHB1
+            filename = re.sub(r"(^[\w]{3,5}-\d{3})([A,B,C,D])", r"\1", filename, flags=re.I) # 检查像是 mibd-706A
             file_number = str(re.search(r'\w+(-|_)\w+', filename, re.A).group())
             file_number = re.sub("(-|_)c$", "", file_number, flags=re.IGNORECASE)
             if re.search("\d+ch$", file_number, flags=re.I):
                 file_number = file_number[:-2]
+            return file_number.upper()
+        # 检查类似文件名 '1Fadss011 (FALENO)すぐにイッちゃう早漏メイド 神代にな'
+        elif temp_filenumber and temp_filenumber.group(1) and temp_filenumber.group(2):
+            file_number = str(temp_filenumber.group(1)) + \
+                '-' + str(temp_filenumber.group(2))
             return file_number.upper()
         else:  # 提取不含减号-的番号，FANZA CID
             # 欧美番号匹配规则
@@ -122,7 +130,12 @@ G_TAKE_NUM_RULES = {
     r'\bmsd-\d{2,}':msd,
     r'\bmky-[a-z]{2,2}-\d{2,}':mky,
     r'\byk-\d{2,3}': yk,
-    r'\bpm[a-z]?-?\d{2,}':pm
+    r'\bpm[a-z]?-?\d{2,}':pm,
+    'jac' : lambda x: 'JAC-' + re.findall(r'[390]{3}?jac-(\d{3})', x, re.I)[0],
+    'luxu' : lambda x: 'LUXU-' + re.search(r'[259]{3}?luxu-(\d{4})(-c)?', x, re.I)[1],
+    'stcv|maan|gana|mium|ara|ene|jnt|ntk|otim|sgk|imgn|ppz|suke|mfc|simm|dam|ten': 
+        lambda x: str("".join(re.search(r'\d{3}?(\D{3,4})(-)(\d{3,4})(-c)?', x, re.I).group(1, 2, 3))),
+    'instc': lambda x: str("".join(re.search(r'\d{3}?(\D{5})(-)(\d{3,4})(-c)?', x, re.I).group(1, 2, 3)))
 }
 
 

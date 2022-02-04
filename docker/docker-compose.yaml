@@ -1,13 +1,13 @@
-version: "2.2"
+version: "3"
 services:
-  jav:
-    user: "${JAVUID}:${JAVGID}"
-    image: jav:local
+  mdc:
+    image: mdc:local
     build: .
     volumes:
-      - ./config.ini:/jav/config.ini
-      - ${JAV_PATH}:/jav/data
-    command:
-      - python
-      - /jav/AV_Data_Capture.py
-      - -a
+      - ./config.ini:/app/config.ini
+      - ../javdb.json:/app/javdb.json
+      - ${source_folder}:/app/data
+      - ${JAV_output}:/app/JAV_output
+    entrypoint: "./docker-entrypoint.sh"
+    security_opt:
+      - "label:disable"

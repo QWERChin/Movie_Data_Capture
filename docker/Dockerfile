@@ -1,8 +1,5 @@
 FROM python:slim
-RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list \
-    && sed -i 's/security.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list
-RUN pip install -i https://pypi.tuna.tsinghua.edu.cn/simple pip -U \
-    && pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+LABEL maintainer="QWERChin"
 
 RUN apt-get update \
     && apt-get install -y wget ca-certificates \
@@ -13,4 +10,26 @@ RUN apt-get update \
     && pip install --no-cache-dir requests lxml Beautifulsoup4 pillow \
     && apt-get purge -y wget
 
-WORKDIR /jav
+RUN \
+    apt-get update && \
+    apt-get install -y wget ca-certificates git && \
+    git clone https://github.com/QWERChin/Movie_Data_Capture.git && \
+    mv Movie_Data_Capture /app && \
+    cd /app && \
+    sed -i '/pyinstaller/d' requirements.txt && \
+    cat requirements.txt && \
+    pip install --no-cache-dir -r requirements.txt && \
+    apt-get purge -y wget
+
+VOLUME /app/data
+VOLUME /app/JAV_output
+WORKDIR /app
+
+# 镜像版本号
+ARG BUILD_DATE
+
+ENV LANG C.UTF-8
+ADD docker-entrypoint.sh docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh
+
+ENTRYPOINT ["./docker-entrypoint.sh"]

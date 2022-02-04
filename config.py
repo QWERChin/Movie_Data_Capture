@@ -173,9 +173,15 @@ class Config:
 
     def failed_folder(self) -> str:
         return self.conf.get("common", "failed_output_folder")
+    
+    def exist_folder(self) -> str:
+        return self.conf.get("common", "exist_output_folder")
 
     def success_folder(self) -> str:
         return self.conf.get("common", "success_output_folder")
+
+    def check_exist_folder(self) -> str:
+        return self.conf.get("common", "check_exist_folder")
 
     def actor_gender(self) -> str:
         return self.conf.get("common", "actor_gender")
